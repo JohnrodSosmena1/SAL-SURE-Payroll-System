@@ -60,12 +60,12 @@ QPushButton#primaryBtn:hover {{
 }}
 
 QPushButton#secondaryBtn {{
-    background-color: transparent;
+    background-color: #EFF6FF;
     color: {PALETTE['sidebar']};
-    border: 2px solid rgba(30,64,175,0.08);
+    border: none;
 }}
 QPushButton#secondaryBtn:hover {{
-    background-color: rgba(59,130,246,0.08);
+    background-color: #DBEAFE;
 }}
 
 QPushButton#sidebarBtn {{
@@ -410,7 +410,7 @@ class DashboardWindow(QMainWindow):
         inactive = max(0, total_employees - active)
         pending_pay = sum(1 for e in self.employees.values() if e.get("pending", False))
 
-        cpb_active = CircularProgressBar(active, max(1, total_employees), "Active Staff", PALETTE['accen'])
+        cpb_active = CircularProgressBar(active, max(1, total_employees), "Active Staff", PALETTE['accent'])
         cpb_inactive = CircularProgressBar(inactive, max(1, total_employees), "Inactive", "#06b6d4")
         stats_row.addWidget(cpb_active)
         stats_row.addWidget(cpb_inactive)
@@ -482,8 +482,9 @@ class DashboardWindow(QMainWindow):
         for e in self.employees.values():
             d = e.get("department", "Unknown")
             dept_count[d] = dept_count.get(d, 0) + 1
-        most_common_dept = max(dept_count.items(), key=lambda x: x[1], default=("None", 0))[0]
-        stats_layout.addWidget(QLabel(f"Largest Department: {most_common_dept}"))
+        if dept_count:
+            largest_dept = max(dept_count, key=dept_count.get)
+            stats_layout.addWidget(QLabel(f"Largest Department: {largest_dept}"))
         stats_frame.setLayout(stats_layout)
         lower_row.addWidget(stats_frame, 1)
 
@@ -491,77 +492,38 @@ class DashboardWindow(QMainWindow):
         lower_widget.setLayout(lower_row)
         self.content_layout.addWidget(lower_widget)
 
-    def make_colored_card(self, title, value):
-        w = QFrame()
-        w.setProperty("class", "card")
-        w.setFixedSize(220, 110)
-        layout = QVBoxLayout()
-        layout.setContentsMargins(12, 12, 12, 12)
-        t = QLabel(title)
-        t.setStyleSheet("font-size:12px; color: #334155;")
-        v = QLabel(value)
-        v.setStyleSheet("font-weight:800; font-size:20px; color: #0f172a;")
-        layout.addWidget(t)
-        layout.addStretch()
-        layout.addWidget(v)
-        w.setLayout(layout)
-        return w
-
     def create_line_chart(self):
         series = QLineSeries()
-        series.append(0, 18000)
-        series.append(1, 21000)
-        series.append(2, 19500)
-        series.append(3, 23000)
-        series.append(4, 22000)
-        series.append(5, 23350)
+        # Dummy data
+        for x in range(6):
+            series.append(x, 15000 + x * 1000 + (x % 3) * 2000)
 
         chart = QChart()
         chart.addSeries(series)
-        chart.setTitle("Payroll Trend (sample)")
-        chart.legend().hide()
+        chart.setTitle("Payroll Trend (Sample)")
+        chart.createDefaultAxes()
         chart.setAnimationOptions(QChart.SeriesAnimations)
-        series.setColor(QColor(PALETTE['accent']))
+        chart.legend().hide()
 
-        axis_x = QValueAxis()
-        axis_x.setRange(0, 5)
-        axis_x.setLabelFormat("%d")
-        axis_x.setTickCount(6)
-        chart.addAxis(axis_x, Qt.AlignBottom)
-        series.attachAxis(axis_x)
-
-        axis_y = QValueAxis()
-        axis_y.setRange(15000, 25000)
-        axis_y.setLabelFormat("%d")
-        chart.addAxis(axis_y, Qt.AlignLeft)
-        series.attachAxis(axis_y)
+        axisX = QValueAxis()
+        axisX.setTickCount(6)
+        axisX.setLabelFormat("%d")
+        chart.setAxisX(axisX, series)
 
         view = QChartView(chart)
         view.setRenderHint(QPainter.Antialiasing)
-        view.setMinimumHeight(260)
-        view.setStyleSheet("background: white; border-radius: 12px;")
+        view.setStyleSheet("background-color: white; border-radius: 12px;")
         return view
 
     def create_pie_chart(self):
-        dept_count = {}
-        total = len(self.employees)
-        for e in self.employees.values():
-            d = e.get("department", "Unknown")
-            dept_count[d] = dept_count.get(d, 0) + 1
-
         series = QPieSeries()
-        if dept_count:
-            for k, v in dept_count.items():
-                series.append(f"{k} ({(v / max(1, total))*100:.1f}%)", v)
-        else:
-            series.append("IT (50.0%)", 2)
-            series.append("HR (25.0%)", 1)
-            series.append("Finance (25.0%)", 1)
-
-        colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-        for i, s in enumerate(series.slices()):
-            s.setLabelVisible(True)
-            s.setColor(QColor(colors[i % len(colors)]))
+        # Dummy departments
+        depts = {"Operations": 17, "IT": 12, "HR": 12, "Customer Serv.": 11, "Finance": 11, "Marketing": 11}
+        colors = ["#7C3AED", "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#06B6D4"]
+        for i, (dept, pct) in enumerate(depts.items()):
+            slice_ = series.append(f"{dept} ({pct}%)", pct)
+            slice_.setLabelVisible(True)
+            slice_.setColor(QColor(colors[i]))
 
         chart = QChart()
         chart.addSeries(series)
@@ -571,9 +533,23 @@ class DashboardWindow(QMainWindow):
 
         view = QChartView(chart)
         view.setRenderHint(QPainter.Antialiasing)
-        view.setMinimumHeight(260)
-        view.setStyleSheet("background: white; border-radius: 12px;")
+        view.setStyleSheet("background-color: white; border-radius: 12px;")
         return view
+
+    def make_colored_card(self, title, value):
+        w = QFrame()
+        w.setProperty("class", "card")
+        w.setStyleSheet("background-color: #EFF6FF; border-radius: 12px; border: 1px solid #DBEAFE;")
+        w.setFixedSize(220, 100)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(QLabel(title))
+        val = QLabel(value)
+        val.setStyleSheet("font-weight:800; font-size:18px; color: #0f172a;")
+        layout.addStretch()
+        layout.addWidget(val)
+        w.setLayout(layout)
+        return w
 
     def show_manage_view(self):
         self.clear_content()
@@ -592,68 +568,74 @@ class DashboardWindow(QMainWindow):
         header_widget.setLayout(header)
         self.content_layout.addWidget(header_widget)
 
+        form_frame = QFrame()
+        form_frame.setProperty("class", "panel")
         form_layout = QGridLayout()
-        form_layout.setHorizontalSpacing(12)
-        form_layout.setVerticalSpacing(8)
+        form_layout.setContentsMargins(20, 20, 20, 20)
+        form_layout.setSpacing(12)
 
+        form_layout.addWidget(QLabel("Username (key):"), 0, 0)
         self.input_name = QLineEdit()
         self.input_name.setPlaceholderText("Employee Username")
+        form_layout.addWidget(self.input_name, 0, 1)
+
+        form_layout.addWidget(QLabel("Email:"), 1, 0)
         self.input_email = QLineEdit()
         self.input_email.setPlaceholderText("Email")
+        form_layout.addWidget(self.input_email, 1, 1)
+
+        form_layout.addWidget(QLabel("Employee ID:"), 2, 0)
         self.input_empid = QLineEdit()
         self.input_empid.setPlaceholderText("Employee ID")
+        form_layout.addWidget(self.input_empid, 2, 1)
+
+        form_layout.addWidget(QLabel("Salary (monthly):"), 3, 0)
         self.input_salary = QLineEdit()
         self.input_salary.setPlaceholderText("Base Salary (Monthly)")
+        form_layout.addWidget(self.input_salary, 3, 1)
+
+        form_layout.addWidget(QLabel("Days worked:"), 4, 0)
         self.input_days = QLineEdit()
         self.input_days.setPlaceholderText("Attendance (Days Worked)")
+        form_layout.addWidget(self.input_days, 4, 1)
+
+        form_layout.addWidget(QLabel("Department:"), 5, 0)
         self.input_dept = QLineEdit()
         self.input_dept.setPlaceholderText("Department (optional)")
+        form_layout.addWidget(self.input_dept, 5, 1)
+
+        form_layout.addWidget(QLabel("Password:"), 6, 0)
         self.input_password = QLineEdit()
         self.input_password.setPlaceholderText("Password (leave blank to keep existing)")
         self.input_password.setEchoMode(QLineEdit.Password)
-
-        form_layout.addWidget(QLabel("Username (key):"), 0, 0)
-        form_layout.addWidget(self.input_name, 0, 1)
-        form_layout.addWidget(QLabel("Email:"), 1, 0)
-        form_layout.addWidget(self.input_email, 1, 1)
-        form_layout.addWidget(QLabel("Employee ID:"), 2, 0)
-        form_layout.addWidget(self.input_empid, 2, 1)
-        form_layout.addWidget(QLabel("Salary (monthly):"), 3, 0)
-        form_layout.addWidget(self.input_salary, 3, 1)
-        form_layout.addWidget(QLabel("Days worked:"), 4, 0)
-        form_layout.addWidget(self.input_days, 4, 1)
-        form_layout.addWidget(QLabel("Department:"), 5, 0)
-        form_layout.addWidget(self.input_dept, 5, 1)
-        form_layout.addWidget(QLabel("Password:"), 6, 0)
         form_layout.addWidget(self.input_password, 6, 1)
 
-        form_widget = QFrame()
-        form_widget.setProperty("class", "panel")
-        form_widget.setLayout(form_layout)
-        form_widget.setStyleSheet("padding: 12px;")
-        self.content_layout.addWidget(form_widget)
+        form_frame.setLayout(form_layout)
+        self.content_layout.addWidget(form_frame)
 
         btn_row = QHBoxLayout()
-        load_btn = QPushButton("Load Employee")
-        load_btn.setObjectName("primaryBtn")
-        load_btn.setFixedHeight(36)
-        load_btn.clicked.connect(self.load_employee_for_edit)
-        save_btn = QPushButton("Save Employee")
-        save_btn.setObjectName("primaryBtn")
-        save_btn.setFixedHeight(36)
-        save_btn.clicked.connect(self.save_employee_from_manage)
-        calc_btn = QPushButton("Calculate Payroll")
-        calc_btn.setObjectName("primaryBtn")
-        calc_btn.setFixedHeight(36)
-        calc_btn.clicked.connect(self.calculate_payroll_table)
-        approve_btn = QPushButton("Approve Payroll")
-        approve_btn.setObjectName("primaryBtn")
-        approve_btn.setFixedHeight(36)
-        approve_btn.clicked.connect(self.approve_payroll)
-        btn_row.addWidget(load_btn)
-        btn_row.addWidget(save_btn)
-        btn_row.addWidget(calc_btn)
-        btn_row.addWidget(approve_btn)
+        btn_row.setSpacing(10)
+
+        self.load_btn = QPushButton("Load Employee")
+        self.load_btn.setObjectName("secondaryBtn")
+        self.load_btn.clicked.connect(self.load_employee)
+        btn_row.addWidget(self.load_btn)
+
+        self.save_btn = QPushButton("Save Employee")
+        self.save_btn.setObjectName("secondaryBtn")
+        self.save_btn.clicked.connect(self.save_employee)
+        btn_row.addWidget(self.save_btn)
+
+        self.calc_btn = QPushButton("Calculate Payroll")
+        self.calc_btn.setObjectName("secondaryBtn")
+        self.calc_btn.clicked.connect(self.calculate_payroll_table)
+        btn_row.addWidget(self.calc_btn)
+
+        self.approve_btn = QPushButton("Approve Payroll")
+        self.approve_btn.setObjectName("secondaryBtn")
+        self.approve_btn.clicked.connect(self.approve_payroll)
+        btn_row.addWidget(self.approve_btn)
+
         btn_widget = QWidget()
         btn_widget.setLayout(btn_row)
         self.content_layout.addWidget(btn_widget)
@@ -662,43 +644,50 @@ class DashboardWindow(QMainWindow):
         self.pay_table.setColumnCount(5)
         self.pay_table.setHorizontalHeaderLabels(["Name", "ID", "Base Salary", "Days Worked", "Calculated Salary"])
         self.pay_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.pay_table.setStyleSheet("background-color: white; border-radius: 8px;")
         self.content_layout.addWidget(self.pay_table)
 
-    def load_employee_for_edit(self):
+    def load_employee(self):
         key = self.input_name.text().strip()
         if not key:
-            QMessageBox.warning(self, "Validation", "Enter username to load.")
-            return
-        emp = get_employee(key)
-        if emp:
-            self.input_email.setText(emp.get('email', ''))
-            self.input_empid.setText(emp.get('id', ''))
-            self.input_salary.setText(str(emp.get('salary', 0)))
-            self.input_days.setText(str(emp.get('days', 0)))
-            self.input_dept.setText(emp.get('department', 'Unknown'))
-            QMessageBox.information(self, "Loaded", f"Employee '{key}' loaded for editing.")
-        else:
-            QMessageBox.warning(self, "Not Found", f"Employee '{key}' not found.")
-
-    def save_employee_from_manage(self):
-        key = self.input_name.text().strip()
-        if not key:
-            QMessageBox.warning(self, "Validation", "Username/key is required.")
+            QMessageBox.warning(self, "Error", "Enter Username to load.")
             return
         try:
-            salary_val = float(self.input_salary.text())
-            days_val = int(self.input_days.text())
+            emp = get_employee(key)
+            if emp:
+                self.input_email.setText(emp.get("email", ""))
+                self.input_empid.setText(emp.get("id", ""))
+                self.input_salary.setText(str(emp.get("salary", "")))
+                self.input_days.setText(str(emp.get("days", "")))
+                self.input_dept.setText(emp.get("department", ""))
+                # Password not loaded for security
+                QMessageBox.information(self, "Loaded", f"Employee '{key}' loaded.")
+            else:
+                QMessageBox.warning(self, "Not Found", f"Employee '{key}' not found.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load: {str(e)}")
+
+    def save_employee(self):
+        key = self.input_name.text().strip()
+        if not key:
+            QMessageBox.warning(self, "Error", "Username required.")
+            return
+
+        try:
+            salary = float(self.input_salary.text().strip() or "0")
+            days = int(self.input_days.text().strip() or "0")
         except ValueError:
-            QMessageBox.warning(self, "Validation", "Salary must be a number and Days must be an integer.")
+            QMessageBox.warning(self, "Error", "Invalid salary or days.")
             return
 
         emp = {
-            "name": self.input_name.text(),
-            "email": self.input_email.text(),
-            "id": self.input_empid.text(),
-            "salary": salary_val,
-            "days": days_val,
-            "department": self.input_dept.text() or "Unknown",
+            "name": key,
+            "email": self.input_email.text().strip(),
+            "id": self.input_empid.text().strip(),
+            "salary": salary,
+            "days": days,
+            "department": self.input_dept.text().strip(),
+            "created_at": datetime.now(),
             "status": "Active",
             "pending": True
         }
