@@ -13,17 +13,16 @@ from PyQt5.QtChart import QChart, QChartView, QLineSeries, QPieSeries, QValueAxi
 # Backend functions (keep your existing db.py)
 from db import load_employees, save_employees, get_employee, delete_employee, save_payrolls, load_payrolls
 
-
 # ------------------ Global Design Tokens ------------------
 PALETTE = {
-    "sidebar": "#1E40AF",      # deep blue
-    "accent": "#3B82F6",       # bright accent blue
-    "bg": "#F3F4F6",           # light gray background
-    "card": "#FFFFFF",         # white cards
-    "text": "#1F2937",         # dark gray text
-    "muted": "#6B7280",        # secondary text
-    "danger": "#EF4444",       # red
-    "success": "#10B981",      # green
+    "sidebar": "#1E40AF",  # deep blue
+    "accent": "#3B82F6",  # bright accent blue
+    "bg": "#F3F4F6",  # light gray background
+    "card": "#FFFFFF",  # white cards
+    "text": "#1F2937",  # dark gray text
+    "muted": "#6B7280",  # secondary text
+    "danger": "#EF4444",  # red
+    "success": "#10B981",  # green
 }
 
 GLOBAL_STYLE = f"""
@@ -130,6 +129,7 @@ QLabel.subtitle {{
 }}
 """
 
+
 # ------------------ Circular Progress Widget ------------------
 class CircularProgressBar(QWidget):
     def __init__(self, value, max_value, title, color):
@@ -138,14 +138,14 @@ class CircularProgressBar(QWidget):
         self.max_value = max_value if max_value > 0 else 1
         self.title = title
         self.color = color
-        self.setMinimumSize(140, 150)
+        self.setMinimumSize(220, 210)  # Increased size for better text fitting
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect = QRect(15, 10, 110, 110)
+        rect = QRect(15, 10, 130, 130)  # Slightly larger arc rect to match new size
         percentage = int((self.value / self.max_value) * 100)
         percentage = max(0, min(100, percentage))
 
@@ -164,9 +164,11 @@ class CircularProgressBar(QWidget):
         painter.setFont(QFont('Segoe UI', 12, QFont.Bold))
         painter.drawText(rect, Qt.AlignCenter, f"{percentage}%")
 
+        # Improved title drawing: smaller font, multi-line support with wrapping
         painter.setFont(QFont('Segoe UI', 9))
         painter.setPen(QColor(PALETTE['muted']))
-        painter.drawText(0, rect.bottom() + 10, self.width(), 30, Qt.AlignCenter, self.title)
+        title_rect = QRect(0, rect.bottom() + 5, self.width(), 40)  # Increased height for wrapping
+        painter.drawText(title_rect, Qt.AlignCenter | Qt.TextWordWrap, self.title)
 
 
 # ------------------ MAIN ENTRY / SELECTION ------------------
@@ -382,12 +384,29 @@ class DashboardWindow(QMainWindow):
     def show_dashboard_view(self):
         self.clear_content()
 
+        # Modified header with Admin text on right and logout button on left
         header_row = QHBoxLayout()
-        notify = QPushButton("🔔")
-        notify.setFixedSize(40, 40)
-        notify.setStyleSheet("border-radius: 10px; background: white;")
+
+        # Logout button on the left
+        logout_btn = QPushButton("Logout")
+        logout_btn.setObjectName("logoutBtn")
+        logout_btn.setFixedHeight(36)
+        logout_btn.clicked.connect(self.logout)
+        header_row.addWidget(logout_btn)
+
+        # Admin text on the right
+        admin_label = QLabel("Admin")
+        admin_label.setStyleSheet("""
+            font-size: 14px; 
+            font-weight: 700; 
+            color: #1E40AF;
+            padding: 8px 16px;
+            background: #EFF6FF;
+            border-radius: 8px;
+        """)
         header_row.addStretch()
-        header_row.addWidget(notify)
+        header_row.addWidget(admin_label)
+
         header_widget = QWidget()
         header_widget.setLayout(header_row)
         self.content_layout.addWidget(header_widget)
@@ -401,9 +420,9 @@ class DashboardWindow(QMainWindow):
         top_widget.setLayout(top)
         self.content_layout.addWidget(top_widget)
 
-        # Stats row
+        # Stats row with adjusted spacing and minimum width for progress bars
         stats_row = QHBoxLayout()
-        stats_row.setSpacing(14)
+        stats_row.setSpacing(20)  # Increased spacing for better separation
 
         total_employees = len(self.employees)
         active = sum(1 for e in self.employees.values() if e.get("status", "Active") == "Active")
@@ -411,7 +430,9 @@ class DashboardWindow(QMainWindow):
         pending_pay = sum(1 for e in self.employees.values() if e.get("pending", False))
 
         cpb_active = CircularProgressBar(active, max(1, total_employees), "Active Staff", PALETTE['accent'])
+        cpb_active.setMinimumWidth(180)  # Enforce minimum width for text
         cpb_inactive = CircularProgressBar(inactive, max(1, total_employees), "Inactive", "#06b6d4")
+        cpb_inactive.setMinimumWidth(180)  # Enforce minimum width for text
         stats_row.addWidget(cpb_active)
         stats_row.addWidget(cpb_inactive)
 
@@ -430,13 +451,15 @@ class DashboardWindow(QMainWindow):
         stats_widget.setLayout(stats_row)
         self.content_layout.addWidget(stats_widget)
 
-        # Charts row
+        # Charts row with adjusted stretch factors
         charts_row = QHBoxLayout()
-        charts_row.setSpacing(12)
+        charts_row.setSpacing(20)  # Increased spacing
+
         line = self.create_line_chart()
+        line.setMaximumWidth(600)  # Limit line chart width to prevent it from dominating
         pie = self.create_pie_chart()
-        charts_row.addWidget(line, 2)
-        charts_row.addWidget(pie, 1)
+        charts_row.addWidget(line, 1)  # Reduced stretch factor from 2 to 1
+        charts_row.addWidget(pie, 1)  # Keep pie chart stretch at 1
         charts_widget = QWidget()
         charts_widget.setLayout(charts_row)
         self.content_layout.addWidget(charts_widget)
@@ -476,14 +499,14 @@ class DashboardWindow(QMainWindow):
         total_employees = max(1, total_employees)
         avg_salary = sum(e.get("salary", 0) for e in self.employees.values()) / total_employees
         avg_days = sum(e.get("days", 0) for e in self.employees.values()) / total_employees
-        stats_layout.addWidget(QLabel(f"Average Monthly Salary: ₱{avg_salary:.2f}"))
-        stats_layout.addWidget(QLabel(f"Average Days Worked: {avg_days:.1f}"))
         dept_count = {}
         for e in self.employees.values():
             d = e.get("department", "Unknown")
             dept_count[d] = dept_count.get(d, 0) + 1
         if dept_count:
             largest_dept = max(dept_count, key=dept_count.get)
+            stats_layout.addWidget(QLabel(f"Average Monthly Salary: ₱{avg_salary:.2f}"))
+            stats_layout.addWidget(QLabel(f"Average Days Worked: {avg_days:.1f}"))
             stats_layout.addWidget(QLabel(f"Largest Department: {largest_dept}"))
         stats_frame.setLayout(stats_layout)
         lower_row.addWidget(stats_frame, 1)
@@ -517,22 +540,35 @@ class DashboardWindow(QMainWindow):
 
     def create_pie_chart(self):
         series = QPieSeries()
-        # Dummy departments
-        depts = {"Operations": 17, "IT": 12, "HR": 12, "Customer Serv.": 11, "Finance": 11, "Marketing": 11}
+
+        # Compute actual department data (replacing dummy)
+        dept_count = {}
+        for e in self.employees.values():
+            d = e.get("department", "Unknown")
+            dept_count[d] = dept_count.get(d, 0) + 1
+        total = max(1, sum(dept_count.values()))  # Avoid division by zero
+
+        # Sort by size, take top 6 to avoid overcrowding
+        sorted_depts = sorted(dept_count.items(), key=lambda x: x[1], reverse=True)[:6]
+
         colors = ["#7C3AED", "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#06B6D4"]
-        for i, (dept, pct) in enumerate(depts.items()):
-            slice_ = series.append(f"{dept} ({pct}%)", pct)
-            slice_.setLabelVisible(True)
-            slice_.setColor(QColor(colors[i]))
+        for i, (dept, count) in enumerate(sorted_depts):
+            pct = int((count / total) * 100)
+            slice_ = series.append(f"{dept[:12]} ({pct}%)", pct)  # Shorten dept name if >12 chars to prevent cutoff
+            slice_.setLabelVisible(False)  # Hide in-slice labels to reduce clutter
+            slice_.setColor(QColor(colors[i % len(colors)]))  # Cycle colors
 
         chart = QChart()
         chart.addSeries(series)
         chart.setTitle("Department Distribution")
         chart.setAnimationOptions(QChart.SeriesAnimations)
-        chart.legend().setAlignment(Qt.AlignRight)
+        chart.legend().setVisible(True)
+        chart.legend().setAlignment(Qt.AlignBottom)  # Bottom alignment for more horizontal space
+        chart.legend().setFont(QFont('Segoe UI', 8))  # Smaller font to fit full text
 
         view = QChartView(chart)
         view.setRenderHint(QPainter.Antialiasing)
+        view.setMinimumHeight(300)  # Increase height to give legend more room
         view.setStyleSheet("background-color: white; border-radius: 12px;")
         return view
 
